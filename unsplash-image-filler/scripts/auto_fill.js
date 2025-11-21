@@ -140,10 +140,11 @@ async function scanAndFill() {
                     }
 
                     // Calculate relative path for src
-                    // Assuming the web server serves 'public' as root or similar.
-                    // We'll use a relative path from the file if possible, or absolute from root if it starts with /
-                    // Standard convention: /images/unsplash/...
-                    const webPath = `/${imageDestDir.replace(/^public\//, '')}/${cleanQuery}/${destFileName}`;
+                    // We use path.relative to get the path from the file to the image
+                    let webPath = path.relative(path.dirname(filePath), destFile);
+
+                    // Ensure forward slashes for web compatibility (Windows fix)
+                    webPath = webPath.split(path.sep).join('/');
 
                     // Replace src attribute or add it
                     let newTag = fullTag;
