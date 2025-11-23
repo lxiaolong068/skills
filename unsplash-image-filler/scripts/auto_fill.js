@@ -68,6 +68,71 @@ async function getBestKeyword(content, ext) {
     return 'nature'; // Default fallback
 }
 
+async function processArticle($, element, client, targetDir, imageDestDir, filePath) {
+    const sections = [];
+    let currentSection = { header: null, text: '', element: null };
+
+    $(element).children().each((i, el) => {
+        const tagName = $(el).prop('tagName').toLowerCase();
+        if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+            if (currentSection.header || currentSection.text) {
+                sections.push(currentSection);
+            }
+            currentSection = { header: $(el).text(), text: '', element: el };
+        } else {
+            currentSection.text += $(el).text() + ' ';
+        }
+    });
+    if (currentSection.header || currentSection.text) {
+        sections.push(currentSection);
+    }
+
+    for (const section of sections) {
+        // Skip if section already has an image
+        // This is a bit tricky with cheerio traversal, simplified check:
+        // We assume if we inserted it, it's there. 
+        // Real implementation might need to check next siblings.
+
+        const textToAnalyze = (section.header || '') + ' ' + section.text;
+        if (textToAnalyze.trim().length < 20) continue; // Skip short sections
+
+        const query = await getBestKeyword(textToAnalyze, '.html'); // Reuse helper
+        console.log(`Processing section "${section.header || 'Intro'}". Query: "${query}"`);
+
+        try {
+            const photos = await client.searchPhotos(query, 1);
+            if (photos.length > 0) {
+                const photo = photos[0];
+                const cleanQuery = query.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                const destDir = path.join(targetDir, imageDestDir, cleanQuery);
+                const destFileName = `${photo.id}.jpg`;
+                const destFile = path.join(destDir, destFileName);
+
+                try {
+                    await fs.access(destFile);
+                } catch {
+                    await client.downloadImage(photo.urls.regular, destFile);
+                    await client.trackDownload(photo.links.download_location);
+                    console.log(`Downloaded: ${destFile}`);
+                }
+
+                let webPath = path.relative(path.dirname(filePath), destFile);
+                webPath = webPath.split(path.sep).join('/');
+
+                const imgTag = `<img src="${webPath}" alt="${query}" class="unsplash-article-image" style="max-width: 100%; height: auto; margin: 1em 0;">`;
+
+                if (section.element) {
+                    $(section.element).after(imgTag);
+                } else {
+                    $(element).prepend(imgTag);
+                }
+            }
+        } catch (e) {
+            console.error(`Failed to process section:`, e.message);
+        }
+    }
+}
+
 async function scanAndFill() {
     const targetDir = path.resolve(argv.dir);
     const config = await loadConfig(targetDir);
@@ -96,6 +161,22 @@ async function scanAndFill() {
         const ext = path.extname(file);
         let modified = false;
 
+        // 1. Handle Article Segmentation (HTML only for now)
+        if (ext === '.html' && content.includes('data-unsplash-article')) {
+            const $ = cheerio.load(content);
+            const articles = $('[data-unsplash-article]');
+
+            if (articles.length > 0) {
+                console.log(`Found ${articles.length} articles in ${file}`);
+                for (let i = 0; i < articles.length; i++) {
+                    await processArticle($, articles[i], client, targetDir, imageDestDir, filePath);
+                }
+                content = $.html();
+                modified = true;
+            }
+        }
+
+        // 2. Handle Individual Placeholders
         // Regex to find images with data-unsplash attributes
         // Supports: <img ... data-unsplash-auto ... > or <img ... data-unsplash-search="term" ... >
         // We use a global regex to find all instances
@@ -108,6 +189,11 @@ async function scanAndFill() {
 
         while ((match = imgRegex.exec(content)) !== null) {
             const fullTag = match[0];
+            // Skip if already processed (has src) - simple check
+            if (fullTag.includes('src=') && !fullTag.includes('data-unsplash-auto') && !fullTag.includes('data-unsplash-search')) {
+                continue;
+            }
+
             const type = match[1]; // 'auto' or 'search'
             const param = match[2]; // The search term if type is search
 
@@ -166,11 +252,14 @@ async function scanAndFill() {
         }
 
         // Apply replacements in reverse order to preserve indices
-        if (modified) {
+        if (modified && replacements.length > 0) {
             replacements.sort((a, b) => b.start - a.start);
             for (const rep of replacements) {
                 content = content.substring(0, rep.start) + rep.newText + content.substring(rep.end);
             }
+        }
+
+        if (modified) {
             await fs.writeFile(filePath, content, 'utf-8');
             console.log(`Updated ${file}`);
         }
