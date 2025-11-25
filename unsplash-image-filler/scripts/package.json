@@ -9,6 +9,7 @@
         "dotenv": "^16.4.5",
         "glob": "^10.3.10",
         "node-fetch": "^3.3.2",
+        "sharp": "^0.34.5",
         "yargs": "^17.7.2"
     },
     "type": "module"

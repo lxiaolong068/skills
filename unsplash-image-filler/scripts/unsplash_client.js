@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
+import sharp from 'sharp';
 
 export class UnsplashClient {
     constructor(accessKey) {
@@ -32,7 +33,16 @@ export class UnsplashClient {
         }
 
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-        await pipeline(response.body, fs.createWriteStream(destPath));
+
+        // Create a sharp pipeline
+        const transformer = sharp()
+            .resize(1920, null, { // Max width 1920, auto height
+                withoutEnlargement: true, // Don't scale up smaller images
+                fit: 'inside'
+            })
+            .jpeg({ quality: 80, mozjpeg: true }); // Optimize JPEG
+
+        await pipeline(response.body, transformer, fs.createWriteStream(destPath));
     }
 
     async trackDownload(downloadLocation) {
