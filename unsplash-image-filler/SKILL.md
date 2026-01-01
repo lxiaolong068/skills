@@ -27,6 +27,18 @@ This skill helps you automatically populate your website with relevant images fr
         ```html
         <img data-unsplash-search="mountain landscape" />
         ```
+    *   **Auto-insert within an article** (HTML only):
+        ```html
+        <article data-unsplash-article="sections">
+          <!-- inserts after each heading section -->
+        </article>
+        <article data-unsplash-article="paragraphs">
+          <!-- inserts after each paragraph -->
+        </article>
+        <article data-unsplash-article="auto">
+          <!-- headings if present, otherwise paragraphs with smart density -->
+        </article>
+        ```
 
 3.  **Run**: Execute the script to scan and fill images.
     ```bash
@@ -55,3 +67,6 @@ This skill helps you automatically populate your website with relevant images fr
 export UNSPLASH_ACCESS_KEY="your_key_here"
 node scripts/auto_fill.js --dir /path/to/your/project
 ```
+
+See `unsplash-image-filler/examples/blog_smart_density.html` for a longform
+article example that uses `data-unsplash-article="auto"` with smart density.

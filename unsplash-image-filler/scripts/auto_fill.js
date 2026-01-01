@@ -63,6 +63,14 @@ function extractTextFromJsx(content) {
   return text.slice(0, 1000); // Limit to first 1000 chars to avoid noise
 }
 
+function stableHash(input) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
 async function getBestKeyword(content, ext) {
   let text = "";
   if (ext === ".html") {
@@ -95,15 +103,20 @@ async function getBestKeyword(content, ext) {
   return "nature"; // Default fallback
 }
 
-async function processArticle(
-  $,
-  element,
-  client,
-  targetDir,
-  imageDestDir,
-  filePath,
-  dryRun,
-) {
+function normalizeArticleMode(rawMode) {
+  const value = (rawMode || "").trim().toLowerCase();
+  if (!value) return "sections";
+  if (["sections", "section", "headings", "heading"].includes(value)) {
+    return "sections";
+  }
+  if (["paragraphs", "paragraph", "paras"].includes(value)) {
+    return "paragraphs";
+  }
+  if (value === "auto") return "auto";
+  return "sections";
+}
+
+function buildSectionsByHeadings($, element) {
   const sections = [];
   let currentSection = { header: null, text: "", element: null };
 
@@ -120,11 +133,109 @@ async function processArticle(
         currentSection.text += $(el).text() + " ";
       }
     });
+
   if (currentSection.header || currentSection.text) {
     sections.push(currentSection);
   }
 
-  for (const section of sections) {
+  return sections;
+}
+
+function buildSectionsByParagraphs($, element) {
+  const sections = [];
+  let currentHeader = null;
+
+  $(element)
+    .children()
+    .each((i, el) => {
+      const tagName = $(el).prop("tagName").toLowerCase();
+      if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(tagName)) {
+        currentHeader = $(el).text();
+        return;
+      }
+
+      if (tagName === "p") {
+        const text = $(el).text();
+        if (!text.trim()) return;
+        sections.push({ header: currentHeader, text, element: el });
+      }
+    });
+
+  return sections;
+}
+
+function chooseSmartParagraphSections(sections, filePath) {
+  const eligible = sections.filter((section) => {
+    const textToAnalyze = (section.header || "") + " " + section.text;
+    return textToAnalyze.trim().length >= 20;
+  });
+
+  const count = eligible.length;
+  if (count === 0) return [];
+
+  let targetCount = 1;
+  if (count < 6) {
+    targetCount = 1;
+  } else if (count < 12) {
+    targetCount = 2;
+  } else if (count < 20) {
+    targetCount = 3;
+  } else {
+    targetCount = Math.min(5, Math.max(4, Math.round(count / 6)));
+  }
+
+  targetCount = Math.min(targetCount, count);
+
+  const skipEdges = count >= 5 ? 1 : 0;
+  const span = Math.max(1, count - skipEdges * 2);
+  const interval = Math.max(2, Math.floor(span / targetCount));
+  const seed = stableHash(`${filePath}:${count}`);
+  const offset = seed % interval;
+
+  const selected = [];
+  let startIndex = skipEdges + offset;
+  if (startIndex >= count - skipEdges) startIndex = skipEdges;
+
+  for (let idx = startIndex; idx < count - skipEdges; idx += interval) {
+    selected.push(eligible[idx]);
+    if (selected.length >= targetCount) break;
+  }
+
+  if (selected.length === 0) {
+    selected.push(eligible[Math.min(skipEdges, count - 1)]);
+  }
+
+  return selected;
+}
+
+async function processArticle(
+  $,
+  element,
+  client,
+  targetDir,
+  imageDestDir,
+  filePath,
+  dryRun,
+  mode,
+) {
+  let resolvedMode = mode;
+  if (resolvedMode === "auto") {
+    const hasHeadings =
+      $(element).children("h1,h2,h3,h4,h5,h6").length > 0;
+    resolvedMode = hasHeadings ? "sections" : "paragraphs";
+  }
+
+  const sections =
+    resolvedMode === "paragraphs"
+      ? buildSectionsByParagraphs($, element)
+      : buildSectionsByHeadings($, element);
+
+  const useSmartDensity = mode === "auto" && resolvedMode === "paragraphs";
+  const sectionsToProcess = useSmartDensity
+    ? chooseSmartParagraphSections(sections, filePath)
+    : sections;
+
+  for (const section of sectionsToProcess) {
     const textToAnalyze = (section.header || "") + " " + section.text;
     if (textToAnalyze.trim().length < 20) continue; // Skip short sections
 
@@ -141,6 +252,14 @@ async function processArticle(
     }
 
     try {
+      const nextElement = $(section.element).next();
+      if (
+        nextElement &&
+        nextElement.is("img[data-unsplash-processed]")
+      ) {
+        continue;
+      }
+
       const photos = await client.searchPhotos(query, 1);
       if (photos.length > 0) {
         const photo = photos[0];
@@ -211,6 +330,8 @@ async function processFile(file, targetDir, client, imageDestDir, dryRun) {
     if (articles.length > 0) {
       console.log(`Found ${articles.length} article(s) in ${file}`);
       for (let i = 0; i < articles.length; i++) {
+        const rawMode = $(articles[i]).attr("data-unsplash-article");
+        const mode = normalizeArticleMode(rawMode);
         await processArticle(
           $,
           articles[i],
@@ -219,6 +340,7 @@ async function processFile(file, targetDir, client, imageDestDir, dryRun) {
           imageDestDir,
           filePath,
           dryRun,
+          mode,
         );
       }
       if (!dryRun) {
