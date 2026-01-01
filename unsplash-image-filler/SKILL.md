@@ -12,8 +12,7 @@ This skill helps you automatically populate your website with relevant images fr
 1.  **Configuration (Optional)**: Create a `unsplash.config.json` in your project root.
     ```json
     {
-      "accessKey": "YOUR_UNSPLASH_ACCESS_KEY",
-      "imageDestination": "public/images/unsplash"
+      "accessKey": "YOUR_UNSPLASH_ACCESS_KEY"
     }
     ```
     Alternatively, you can set the `UNSPLASH_ACCESS_KEY` environment variable.
@@ -48,8 +47,8 @@ This skill helps you automatically populate your website with relevant images fr
 ## Features
 
 *   **Semantic Analysis**: Uses NLP to analyze page content (titles, headers, paragraphs) and automatically select relevant images for `data-unsplash-auto` placeholders.
-*   **Direct Insertion**: Automatically updates your HTML/JSX files with the correct `src` path to the downloaded image.
-*   **Smart Caching**: Checks if an image already exists to avoid redundant downloads.
+*   **Direct Insertion**: Automatically updates your HTML/JSX files with the Unsplash hotlink URL as `src`.
+*   **Smart Caching**: Uses an in-memory search cache to avoid redundant API searches.
 *   **Configurable**: Customize destination paths and API keys via a config file.
 
 ## Scripts

@@ -35,8 +35,7 @@ const stats = {
   filesModified: 0,
   filesSkipped: 0,
   filesFailed: 0,
-  imagesDownloaded: 0,
-  imagesCached: 0,
+  imagesHotlinked: 0,
   errors: [],
 };
 
@@ -213,7 +212,6 @@ async function processArticle(
   element,
   client,
   targetDir,
-  imageDestDir,
   filePath,
   dryRun,
   mode,
@@ -263,31 +261,13 @@ async function processArticle(
       const photos = await client.searchPhotos(query, 1);
       if (photos.length > 0) {
         const photo = photos[0];
-        const cleanQuery = query.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
-        const destDir = path.join(targetDir, imageDestDir, cleanQuery);
-        const destFileName = `${photo.id}.jpg`;
-        const destFile = path.join(destDir, destFileName);
+        const photoUrl = photo?.urls?.regular;
+        if (!photoUrl) continue;
 
-        let imageExists = false;
-        try {
-          await fs.access(destFile);
-          imageExists = true;
-          stats.imagesCached++;
-        } catch {
-          // File doesn't exist, need to download
-        }
+        await client.trackDownload(photo.links.download_location);
+        stats.imagesHotlinked++;
 
-        if (!imageExists) {
-          await client.downloadImage(photo.urls.regular, destFile);
-          await client.trackDownload(photo.links.download_location);
-          console.log(`Downloaded: ${destFile}`);
-          stats.imagesDownloaded++;
-        }
-
-        let webPath = path.relative(path.dirname(filePath), destFile);
-        webPath = webPath.split(path.sep).join("/");
-
-        const imgTag = `<img src="${webPath}" alt="${query}" class="unsplash-article-image" data-unsplash-processed="true" style="max-width: 100%; height: auto; margin: 1em 0;">`;
+        const imgTag = `<img src="${photoUrl}" alt="${query}" class="unsplash-article-image" data-unsplash-id="${photo.id}" data-unsplash-processed="true" loading="lazy" style="max-width: 100%; height: auto; margin: 1em 0;">`;
 
         if (section.element) {
           $(section.element).after(imgTag);
@@ -306,7 +286,7 @@ async function processArticle(
   }
 }
 
-async function processFile(file, targetDir, client, imageDestDir, dryRun) {
+async function processFile(file, targetDir, client, dryRun) {
   const filePath = path.join(targetDir, file);
   let content;
 
@@ -337,7 +317,6 @@ async function processFile(file, targetDir, client, imageDestDir, dryRun) {
           articles[i],
           client,
           targetDir,
-          imageDestDir,
           filePath,
           dryRun,
           mode,
@@ -390,40 +369,27 @@ async function processFile(file, targetDir, client, imageDestDir, dryRun) {
       const photos = await client.searchPhotos(query, 1);
       if (photos.length > 0) {
         const photo = photos[0];
-        const cleanQuery = query.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
-        const destDir = path.join(targetDir, imageDestDir, cleanQuery);
-        const destFileName = `${photo.id}.jpg`;
-        const destFile = path.join(destDir, destFileName);
+        const photoUrl = photo?.urls?.regular;
+        if (!photoUrl) continue;
 
-        // Download if not exists
-        let imageExists = false;
-        try {
-          await fs.access(destFile);
-          imageExists = true;
-          stats.imagesCached++;
-        } catch {
-          // File doesn't exist
-        }
-
-        if (!imageExists) {
-          await client.downloadImage(photo.urls.regular, destFile);
-          await client.trackDownload(photo.links.download_location);
-          console.log(`Downloaded: ${destFile}`);
-          stats.imagesDownloaded++;
-        }
-
-        // Calculate relative path for src
-        let webPath = path.relative(path.dirname(filePath), destFile);
-        webPath = webPath.split(path.sep).join("/");
+        await client.trackDownload(photo.links.download_location);
+        stats.imagesHotlinked++;
 
         // Build new tag with src and processed marker
         let newTag = fullTag;
 
         // Add or update src attribute
         if (newTag.match(/src=["'][^"']*["']/)) {
-          newTag = newTag.replace(/src=["'][^"']*["']/, `src="${webPath}"`);
+          newTag = newTag.replace(/src=["'][^"']*["']/, `src="${photoUrl}"`);
         } else {
-          newTag = newTag.replace("<img", `<img src="${webPath}"`);
+          newTag = newTag.replace("<img", `<img src="${photoUrl}"`);
+        }
+
+        if (!newTag.includes("data-unsplash-id")) {
+          newTag = newTag.replace(
+            "<img",
+            `<img data-unsplash-id="${photo.id}"`,
+          );
         }
 
         // Add processed marker to prevent re-processing
@@ -490,7 +456,6 @@ async function scanAndFill() {
   }
 
   const client = new UnsplashClient(accessKey);
-  const imageDestDir = config.imageDestination || "public/images/unsplash";
 
   console.log(`Scanning directory: ${targetDir}`);
 
@@ -511,7 +476,7 @@ async function scanAndFill() {
   // Process files sequentially to respect rate limits
   for (const file of files) {
     try {
-      await processFile(file, targetDir, client, imageDestDir, dryRun);
+      await processFile(file, targetDir, client, dryRun);
     } catch (e) {
       // Catch any unexpected errors to prevent entire process from failing
       console.error(`Unexpected error processing ${file}: ${e.message}`);
@@ -526,8 +491,7 @@ async function scanAndFill() {
   console.log(`Files modified: ${stats.filesModified}`);
   console.log(`Files skipped (already processed): ${stats.filesSkipped}`);
   console.log(`Files failed: ${stats.filesFailed}`);
-  console.log(`Images downloaded: ${stats.imagesDownloaded}`);
-  console.log(`Images from cache: ${stats.imagesCached}`);
+  console.log(`Images hotlinked: ${stats.imagesHotlinked}`);
 
   if (stats.errors.length > 0) {
     console.log(`\nErrors (${stats.errors.length}):`);
