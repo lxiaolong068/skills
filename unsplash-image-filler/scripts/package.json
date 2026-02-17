@@ -1,0 +1,16 @@
+{
+    "name": "unsplash-image-filler-scripts",
+    "version": "1.0.0",
+    "description": "Scripts to download images from Unsplash based on project content",
+    "main": "auto_fill.js",
+    "dependencies": {
+        "cheerio": "^1.0.0-rc.12",
+        "compromise": "^14.14.4",
+        "dotenv": "^16.4.5",
+        "glob": "^10.3.10",
+        "node-fetch": "^3.3.2",
+        "sharp": "^0.34.5",
+        "yargs": "^17.7.2"
+    },
+    "type": "module"
+}
