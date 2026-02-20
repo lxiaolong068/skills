@@ -1,6 +1,6 @@
 ---
 name: youtube-to-wechat-article
-description: Create WeChat Official Account articles from YouTube videos with detailed content, network research, fact-checking, and custom illustrations. Supports style analysis of reference articles to extract writing patterns and apply them to new content. Use for converting video content to articles, creating social media content from videos, generating illustrated articles with layout guidance, and adopting specific author styles.
+description: Create WeChat Official Account articles from YouTube videos with detailed content, network research, fact-checking, review & expansion, and custom illustrations. Supports style analysis of reference articles to extract writing patterns and apply them to new content. After writing, performs systematic content review and expansion to boost information density, readability, and narrative depth. Use for converting video content to articles, creating social media content from videos, generating illustrated articles with layout guidance, and adopting specific author styles.
 ---
 
 # YouTube to WeChat Article Creator
@@ -13,9 +13,10 @@ Convert YouTube videos (or other video content) into high-quality WeChat Officia
 2. Extract and understand video content
 3. Enrich content with network research
 4. Write in authentic WeChat Official Account style (with optional style migration)
-5. Cross-validate facts and data
-6. Generate custom illustrations
-7. Provide layout and publishing guidance
+5. **Review and expand content** for richer information density and higher readability
+6. Cross-validate facts and data
+7. Generate custom illustrations
+8. Provide layout and publishing guidance
 
 ## Workflow
 
@@ -79,6 +80,44 @@ Create article following WeChat Official Account style:
 - Data-driven with credible sources
 - Engaging opening and inspiring conclusion
 - If style migration is applied, ensure consistency with reference article's style while maintaining originality
+
+### Phase 3.5: Review & Expand Content
+
+Systematically review the draft and expand thin sections to reach target depth and readability:
+
+- Read `/home/ubuntu/skills/youtube-to-wechat-article/references/review-and-expand-guide.md`
+- Run the **5-dimension review checklist** (structure, content density, readability, language style, accuracy)
+- Annotate all problem areas before rewriting
+- Apply targeted expansion techniques based on identified gaps
+
+**Review dimensions:**
+- **Structure**: strong hook, clear heading hierarchy, smooth transitions, actionable ending
+- **Content density**: every claim backed by data/cases, "why" explained not just "what"
+- **Readability**: paragraph length ≤5 sentences, rhythm variation, bold key points
+- **Language style**: conversational tone, first-person voice, emotional investment, no template phrases
+- **Accuracy**: all numbers sourced, names correct, no internal contradictions
+
+**Expansion priorities (highest ROI first):**
+1. Opening hook — most critical for reader retention
+2. Thinnest sections — fewest words relative to importance
+3. Core argument paragraphs — add data interpretation layer
+4. Closing call-to-action — boost interaction (comment/share)
+5. Transition sentences — improve overall flow
+
+**Expansion techniques to apply:**
+- BAB framework (Before-After-Bridge) for solution introductions
+- Analogies to make complex concepts immediately clear
+- Data interpretation layer: not just numbers, but what they mean
+- Scene-based micro-stories for emotional resonance
+- Q&A pacing (pose reader's likely question, then answer)
+- Expert/authority quotes for credibility
+- Contrast amplification for before/after comparisons
+- Power sentences (bold core insight, then 2-3 sentences expanding it)
+- Cliffhanger chapter endings to drive continued reading
+
+**Target word count:** Initial drafts are typically 3000-4000 characters. Expand to **5000-8000 characters** before proceeding.
+
+---
 
 ### Phase 4: Cross-Validate Content
 
@@ -183,7 +222,9 @@ Deliver all files to user via `message` tool with `result` type:
 - Mobile-friendly image sizes
 
 ### Completeness
-- All 6 phases completed in sequence
+- All 7 phases completed in sequence (Phase 0 optional)
+- Phase 3.5 review checklist passed before proceeding to Phase 4
+- Article reaches 5000-8000 characters after expansion
 - All deliverables provided
 - Ready for immediate publishing
 
@@ -245,6 +286,9 @@ Perform Phase 0 style analysis when:
 
 - Relying solely on video content without research
 - Using overly formal or mechanical language
+- **Skipping Phase 3.5 review** — this is how thin, low-readability drafts get published
+- **Expanding without a plan** — always annotate problem areas first, then rewrite systematically
+- **Only adding length without adding value** — every new sentence must increase information density or improve reading experience
 - Generating illustrations one by one (inefficient)
 - Skipping fact-checking phase
 - Providing incomplete layout guidance
